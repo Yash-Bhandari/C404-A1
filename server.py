@@ -1,6 +1,10 @@
 #  coding: utf-8 
+from dataclasses import dataclass, field
+import re
 import socketserver
+import os
 
+# 服务器端
 # Copyright 2013 Abram Hindle, Eddie Antonio Santos
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,23 +29,81 @@ import socketserver
 # run: python freetests.py
 
 # try: curl -v -X GET http://127.0.0.1:8080/
+class HttpRequest:
+    def __init__(self, data: str):
+        self.data = data
+        self.method = None
+        self.path = None
+        self.version = None
+        lines = self.data.split('\r\n')
+        self.method, self.path, self.version = lines[0].split(' ')
+
+@dataclass
+class HttpResponse:
+    status_code: int
+    status_text: str
+    headers: dict = field(default_factory=lambda: {'Content-Length':0})
+    body: str = ''
+
+    def __str__(self):
+        header_lines = [f'{key}: {value}' for key, value in self.headers.items() if value is not None]
+        headers = self.status_line() + '\r\n' + '\r\n'.join(header_lines) + '\r\n\r\n'
+        return headers + '\r\n' + self.body
+
+    def status_line(self):
+        return f"HTTP/1.1 {self.status_code} {self.status_text}"
+
+    def encode(self):
+        return bytearray(str(self), 'utf-8')
+
+content_types = {
+    '.css': 'text/css',
+    '.html': 'text/html'
+}
 
 class MyWebServer(socketserver.BaseRequestHandler):
-    
+
     def handle(self):
         self.data = self.request.recv(1024).strip()
-        print ("Got a request of: %s\n" % self.data)
+        self.text = self.data.decode('utf-8')
+        print("===== INCOMING REQUEST =====")
+        print(self.text)
+        print("============================")
+        response = self.prepare_response()
 
-        header_lines = [
-        "HTTP/1.1 200 OK",
-        "Content-Length: 0"
-        ]
-        headers = '\r\n'.join(header_lines) + '\r\n'
-        print(headers)
-        response = headers
-        self.request.sendall(bytearray(response, 'utf-8'))
+        print("===== OUTGOING RESPONSE =====")
+        print(response)
+        print("============================")
+        self.request.sendall(response.encode())
 
-        # self.request.sendall(bytearray(response,'utf-8'))
+    def prepare_response(self) -> HttpResponse:
+        request = HttpRequest(self.text)
+
+        if request.method != 'GET':
+            return HttpResponse(405, 'METHOD NOT ALLOWED')
+
+        base_dir = os.path.join(os.getcwd(), 'www')
+        path = request.path
+        if path is None:
+            raise Exception
+
+        if path[-1] == '/':
+            path += 'index.html'
+        path = path[1:]
+        _, file_ext = os.path.splitext(path)
+        full_path = os.path.join(base_dir, path)
+        if os.path.isdir(full_path):
+            full_path += '/'
+        if  os.path.exists(full_path):
+            with open(full_path, 'r') as file:
+                lines = file.readlines()
+            response = HttpResponse(200, 'OK')
+            response.body = '\r\n'.join(lines)
+            response.headers['Content-Length'] = len(response.body)
+            response.headers['Content-Type'] = content_types.get(file_ext)
+            return response
+        else:
+            return HttpResponse(404, 'Not Found')
 
 if __name__ == "__main__":
     HOST, PORT = "localhost", 8080
