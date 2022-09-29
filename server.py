@@ -4,25 +4,11 @@ import re
 import socketserver
 import os
 
-# 服务器端
-# Copyright 2013 Abram Hindle, Eddie Antonio Santos
+# Copyright 2022 Yashaswi Bhandari
 # 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#     http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-#
-#
-# Furthermore it is derived from the Python documentation examples thus
-# some of the code is Copyright © 2001-2013 Python Software
-# Foundation; All Rights Reserved
+# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
 # http://docs.python.org/2/library/socketserver.html
 #
@@ -85,15 +71,20 @@ class MyWebServer(socketserver.BaseRequestHandler):
         base_dir = os.path.join(os.getcwd(), 'www')
         path = request.path
         if path is None:
-            raise Exception
+            path = '/'
 
         if path[-1] == '/':
             path += 'index.html'
         path = path[1:]
         _, file_ext = os.path.splitext(path)
-        full_path = os.path.join(base_dir, path)
+        full_path = os.path.abspath(os.path.join(base_dir, path))
+        if not full_path.startswith(base_dir):
+            return HttpResponse(404, 'NOT FOUND')
         if os.path.isdir(full_path):
-            full_path += '/'
+            response = HttpResponse(303, 'SEE OTHER')
+            # response.headers['Location'] = self.request
+            response.headers['Location'] = path + '/'
+            return response
         if  os.path.exists(full_path):
             with open(full_path, 'r') as file:
                 lines = file.readlines()
