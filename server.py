@@ -1,8 +1,8 @@
 #  coding: utf-8 
 from dataclasses import dataclass, field
-import re
 import socketserver
 import os
+from utils import convert_percent_encoding
 
 # Copyright 2022 Yashaswi Bhandari
 # 
@@ -70,6 +70,7 @@ class MyWebServer(socketserver.BaseRequestHandler):
 
         base_dir = os.path.join(os.getcwd(), 'www')
         path = request.path
+        path = convert_percent_encoding(path)
         if path is None:
             path = '/'
 
